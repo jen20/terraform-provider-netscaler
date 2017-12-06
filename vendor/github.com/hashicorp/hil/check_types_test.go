@@ -216,6 +216,146 @@ func TestTypeCheck(t *testing.T) {
 			},
 			true,
 		},
+
+		{
+			`foo ${true ? "foo" : "bar"}`,
+			&ast.BasicScope{},
+			false,
+		},
+
+		{
+			// can't use different types for true and false expressions
+			`foo ${true ? 1 : "baz"}`,
+			&ast.BasicScope{},
+			true,
+		},
+
+		{
+			// condition must be boolean
+			`foo ${"foo" ? 1 : 5}`,
+			&ast.BasicScope{},
+			true,
+		},
+
+		{
+			// conditional with unknown value is permitted
+			`foo ${true ? known : unknown}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"known": ast.Variable{
+						Type:  ast.TypeString,
+						Value: "bar",
+					},
+					"unknown": ast.Variable{
+						Type:  ast.TypeUnknown,
+						Value: UnknownValue,
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			// conditional with unknown value the other way permitted too
+			`foo ${true ? unknown : known}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"known": ast.Variable{
+						Type:  ast.TypeString,
+						Value: "bar",
+					},
+					"unknown": ast.Variable{
+						Type:  ast.TypeUnknown,
+						Value: UnknownValue,
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			// conditional with two unknowns is allowed
+			`foo ${true ? unknown : unknown}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"unknown": ast.Variable{
+						Type:  ast.TypeUnknown,
+						Value: UnknownValue,
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			// conditional with unknown condition is allowed
+			`foo ${unknown ? 1 : 2}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"unknown": ast.Variable{
+						Type:  ast.TypeUnknown,
+						Value: UnknownValue,
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			// currently lists are not allowed at all
+			`foo ${true ? arr1 : arr2}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"arr1": ast.Variable{
+						Type: ast.TypeList,
+						Value: []ast.Variable{
+							ast.Variable{
+								Type:  ast.TypeInt,
+								Value: 3,
+							},
+						},
+					},
+					"arr2": ast.Variable{
+						Type: ast.TypeList,
+						Value: []ast.Variable{
+							ast.Variable{
+								Type:  ast.TypeInt,
+								Value: 4,
+							},
+						},
+					},
+				},
+			},
+			true,
+		},
+
+		{
+			// mismatching element types are invalid
+			`foo ${true ? arr1 : arr2}`,
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"arr1": ast.Variable{
+						Type: ast.TypeList,
+						Value: []ast.Variable{
+							ast.Variable{
+								Type:  ast.TypeInt,
+								Value: 3,
+							},
+						},
+					},
+					"arr2": ast.Variable{
+						Type: ast.TypeList,
+						Value: []ast.Variable{
+							ast.Variable{
+								Type:  ast.TypeString,
+								Value: "foo",
+							},
+						},
+					},
+				},
+			},
+			true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -299,6 +439,27 @@ func TestTypeCheck_implicit(t *testing.T) {
 							ast.Variable{
 								Type:  ast.TypeInt,
 								Value: 23,
+							},
+						},
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			"${foo[1]}",
+			&ast.BasicScope{
+				VarMap: map[string]ast.Variable{
+					"foo": ast.Variable{
+						Type: ast.TypeList,
+						Value: []ast.Variable{
+							ast.Variable{
+								Type:  ast.TypeInt,
+								Value: 42,
+							},
+							ast.Variable{
+								Type: ast.TypeUnknown,
 							},
 						},
 					},
